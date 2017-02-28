@@ -20,9 +20,21 @@ public class Player : PhysicsEntity
     public float m_DashForce = 20.0f;
     public float m_DashTime = 0.5f;
 
+    [Header("Shooting variables")]
+    [Range(0.01f, 10.0f)]
+    public float m_ShootInterval = 0.5f;
+    public float m_SpawnOffset = 3.0f;
+    [Range(1.0f, 200.0f)]
+    public float m_ProjectileSpeed = 30.0f;
+    [Range(0.0f, 90.0f)]
+    public float m_ProjectileSpread = 1.0f;
+
     [Header("Raycast layers")]
     public LayerMask m_GroundMask;
     public LayerMask m_WallMask;
+
+    [Header("Spawnable prefabs")]
+    public GameObject m_ProjectilePrefab;
 
     //Component vars
     private Rigidbody2D m_Rigidbody;
@@ -40,20 +52,33 @@ public class Player : PhysicsEntity
     private float m_PauseTimer = 0.0f;
     private bool m_IsDash = false;
     private bool m_Interrupted = false;
-    private Vector2 m_DashDir = Vector2.zero;
     private float m_DashTimer = 0.0f;
+    private Vector2 m_DashDir = Vector2.zero;
+    private Transform m_PauseCirle;
+    private Vector3 m_PauseScale = Vector3.zero;
 
     //Rotation vars
-    private Transform m_CursorRotation;
+    private Transform m_Cursor;
+    private Vector2 m_CursorDir = Vector2.zero;
+
+    //Shooting vars
+    private float m_ShootTimer = 0.0f;
 
     void Awake()
     {
         m_Rigidbody = GetComponent<Rigidbody2D>();
         m_Collider = GetComponent<Collider2D>();
 
-        m_CursorRotation = transform.FindChild("CursorRotation");
-        if (!m_CursorRotation)
+        m_Cursor = transform.FindChild("CursorRotation");
+        if (!m_Cursor)
             Debug.LogError("Player could not find cursor rotation!");
+
+        m_PauseCirle = transform.FindChild("PauseCircle");
+        if (!m_PauseCirle)
+            Debug.LogError("Player could not find pause circle!");
+
+        m_PauseScale = m_PauseCirle.localScale;
+        m_PauseCirle.localScale = Vector3.zero;
     }
 	
 	void Update()
@@ -62,23 +87,30 @@ public class Player : PhysicsEntity
         JumpUpdate();
         DashUpdate();
         CursorRotation();
+        ShootUpdate();
 	}
 
     void CursorRotation()
     {
-        if (m_CursorRotation)
+        if (m_Cursor)
         {
-            Vector2 dir = Input.mousePosition - Camera.main.WorldToScreenPoint(m_CursorRotation.position);
+            Vector2 dir = Input.mousePosition - Camera.main.WorldToScreenPoint(m_Cursor.position);
             float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
 
-            m_CursorRotation.rotation = Quaternion.AngleAxis(angle, Vector3.forward);
+            m_Cursor.rotation = Quaternion.AngleAxis(angle, Vector3.forward);
+            m_CursorDir = ((m_Cursor.position + m_Cursor.right) - transform.position).normalized;
         }
     }
 
     void JumpUpdate()
     {
         m_Grounded = GroundCheck();
-        m_Jump = m_Rigidbody.velocity.y > 0;
+        if (m_Grounded)
+            m_Rigidbody.gravityScale = 0.0f;
+        else
+            m_Rigidbody.gravityScale = 1.0f;
+
+        m_Jump = Mathf.Round(m_Rigidbody.velocity.y) > 0;
         if (Input.GetKey(KeyCode.Space) && m_Grounded && !m_Jump)
             m_Rigidbody.AddForce(Vector2.up * m_JumpForce, ForceMode2D.Impulse);
     }
@@ -86,29 +118,34 @@ public class Player : PhysicsEntity
     void DashUpdate()
     {
         m_IsPaused = Input.GetMouseButton(1);
-        if (m_IsPaused && !m_Interrupted)
+        if (m_IsPaused && !m_Interrupted && !m_IsDash)
         {
-            m_Rigidbody.gravityScale = 0.0f;
-            m_Rigidbody.velocity = Vector2.zero;
+            m_Rigidbody.velocity *= 0.3f;
             m_PauseTimer += Time.deltaTime;
 
             if (m_PauseTimer >= m_PauseTime)
             {
                 m_PauseTimer = 0.0f;
                 m_Interrupted = true;
-                m_Rigidbody.gravityScale = 1.0f;
+                m_PauseCirle.localScale = Vector3.zero;
             }
+
+            if (Mathf.Round(m_PauseCirle.localScale.magnitude) == 0 && !m_Interrupted)
+                m_PauseCirle.localScale = m_PauseScale;
+
+            //m_PauseCirle.localScale -= Vector3.one * (m_PauseScale.x - 1.0f) * Time.deltaTime;
+            m_PauseCirle.localScale = Vector3.Lerp(m_PauseCirle.localScale, Vector3.one, (m_PauseScale.x - 1.0f) * Time.deltaTime / m_PauseTime);
         }
         else if (m_Interrupted)
             m_Interrupted = !Input.GetMouseButtonUp(1);
-        else if (!m_Interrupted)
+        else if (!m_Interrupted && !m_IsDash)
         {
             if (Input.GetMouseButtonUp(1))
             {
-                m_DashDir = ((m_CursorRotation.position + m_CursorRotation.transform.right) - transform.position).normalized;
+                m_PauseCirle.localScale = Vector3.zero;
+                m_DashDir = m_CursorDir;
                 m_IsDash = true;
                 m_PauseTimer = 0.0f;
-                m_Rigidbody.gravityScale = 1.0f;
             }
         }
 
@@ -120,7 +157,6 @@ public class Player : PhysicsEntity
             if (m_DashTimer >= m_DashTime)
             {
                 m_DashTimer = 0.0f;
-                m_Rigidbody.gravityScale = 1.0f;
                 m_IsDash = false;
                 m_Rigidbody.velocity *= 0.3f;
             }
@@ -134,6 +170,42 @@ public class Player : PhysicsEntity
 
         if (!m_IsDash)
             m_Rigidbody.velocity = new Vector2(m_Horizontal * m_Speed, m_Rigidbody.velocity.y);
+    }
+
+    void Shoot()
+    {
+        if (m_ProjectilePrefab)
+        {
+            GameObject clone = (GameObject)Instantiate(m_ProjectilePrefab, m_Cursor.position + m_Cursor.right * m_SpawnOffset, Quaternion.Euler(0.0f, 0.0f, m_Cursor.rotation.eulerAngles.z - 90));
+            if (clone.GetComponent<Projectile>())
+            {
+                clone.transform.Rotate(new Vector3(0, 0, Random.Range(-m_ProjectileSpread, m_ProjectileSpread)));
+                clone.GetComponent<Rigidbody2D>().AddForce(clone.transform.up * m_ProjectileSpeed, ForceMode2D.Impulse);
+                //clone.GetComponent<Rigidbody2D>().AddForce(m_CursorDir * m_ProjectileSpeed, ForceMode2D.Impulse);
+            }
+        }
+    }
+
+    void ShootUpdate()
+    {
+        if (Input.GetMouseButton(0))
+        {
+            m_ShootTimer += Time.deltaTime;
+            if (m_ShootTimer >= m_ShootInterval)
+            {
+                m_ShootTimer = 0.0f;
+                Shoot();
+            }
+        }
+        //else
+        //{
+        //    if (m_ShootTimer > 0.0f)
+        //    {
+        //        m_ShootTimer += Time.deltaTime;
+        //        if (m_ShootTimer >= m_ShootInterval)
+        //            m_ShootTimer = 0.0f;
+        //    }
+        //}
     }
 
     bool GroundCheck()
@@ -194,5 +266,18 @@ public class Player : PhysicsEntity
             }
         }
         return hit;
+    }
+
+    void InterruptDash()
+    {
+        m_IsDash = false;
+        m_DashTimer = 0.0f;
+        m_Rigidbody.velocity *= 0.3f;
+    }
+
+    void OnCollisionEnter2D(Collision2D col)
+    {
+        if (m_IsDash)
+            InterruptDash();
     }
 }

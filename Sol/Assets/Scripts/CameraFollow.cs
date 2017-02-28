@@ -49,6 +49,30 @@ public class CameraFollow : MonoBehaviour
                     }
                 }
             }
+
+            float offset = 1.0f;
+
+            for (int i = 0; i < m_Borders.Count; i++)
+            {
+                switch(i)
+                {
+                    case 0:
+                        m_Borders[i].transform.position = new Vector2(transform.position.x, transform.position.y + (Camera.main.orthographicSize - offset));
+                        break;
+
+                    case 1:
+                        m_Borders[i].transform.position = new Vector2(transform.position.x + (Camera.main.orthographicSize - offset) * Camera.main.aspect, transform.position.y);
+                        break;
+
+                    case 2:
+                        m_Borders[i].transform.position = new Vector2(transform.position.x, transform.position.y - (Camera.main.orthographicSize - offset));
+                        break;
+
+                    case 3:
+                        m_Borders[i].transform.position = new Vector2(transform.position.x - (Camera.main.orthographicSize - offset) * Camera.main.aspect, transform.position.y);
+                        break;
+                }
+            }
         }
 	}
 	
