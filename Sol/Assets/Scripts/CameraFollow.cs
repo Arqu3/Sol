@@ -9,6 +9,9 @@ public class CameraFollow : MonoBehaviour
     [Header("Transform to follow")]
     public Transform m_FollowTransform;
 
+    [Header("Raycast mask")]
+    public LayerMask m_RayMask;
+
     //Camera borders
     private List<CameraBorder> m_Borders = new List<CameraBorder>();
 
@@ -51,6 +54,18 @@ public class CameraFollow : MonoBehaviour
 	
 	void Update()
     {
+        for (int i = 0; i < m_Borders.Count; i++)
+        {
+            if (!m_Borders[i].GetColliding() && !CheckPosition(i))
+            {
+                Vector2 dir = m_Borders[i].transform.position - transform.position;
+                bool hit = Physics2D.Raycast(transform.position, dir.normalized, dir.magnitude, m_RayMask);
+                Debug.DrawRay(transform.position, dir.normalized * dir.magnitude);
+                if (hit)
+                    m_Borders[i].SetColliding(true);
+            }
+        }
+
         m_LockedX = m_Borders[1].GetColliding() || m_Borders[3].GetColliding();
         m_LockedY = m_Borders[0].GetColliding() || m_Borders[2].GetColliding();
 
@@ -76,4 +91,24 @@ public class CameraFollow : MonoBehaviour
 
         transform.position = new Vector3(m_PosX, m_PosY, transform.position.z);
 	}
+
+    bool CheckPosition(int i)
+    {
+        switch(i)
+        {
+            case 0:
+                return m_FollowTransform.position.y < transform.position.y;
+
+            case 1:
+                return m_FollowTransform.position.x < transform.position.x; 
+
+            case 2:
+                return m_FollowTransform.position.y > transform.position.y;
+
+            case 3:
+                return m_FollowTransform.position.x > transform.position.x;
+        }
+
+        return false;
+    }
 }
