@@ -89,6 +89,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Damage: 1
+  m_ParticlePrefab: {fileID: 1651638920363988, guid: 165d0f6e6b07edd429f98ec18e64d60c,
+    type: 2}
 --- !u!212 &212511902951573102
 SpriteRenderer:
   m_ObjectHideFlags: 1
