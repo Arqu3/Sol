@@ -17,8 +17,12 @@ public class Player : PhysicsEntity
     [Header("Dash variables")]
     [Range(0.1f, 10.0f)]
     public float m_PauseTime = 2.0f;
+    [Range(1.0f, 100.0f)]
     public float m_DashForce = 20.0f;
+    [Range(0.01f, 10.0f)]
     public float m_DashTime = 0.5f;
+    [Range(0.0f, 20.0f)]
+    public float m_DashCooldown = 1.0f;
 
     [Header("Shooting variables")]
     [Range(0.01f, 10.0f)]
@@ -56,6 +60,8 @@ public class Player : PhysicsEntity
     private Vector2 m_DashDir = Vector2.zero;
     private Transform m_PauseCirle;
     private Vector3 m_PauseScale = Vector3.zero;
+    private List<DashCooldown> m_Cooldowns = new List<DashCooldown>();
+    public int m_CooldownCharges = 0;
 
     //Rotation vars
     private Transform m_Cursor;
@@ -79,6 +85,32 @@ public class Player : PhysicsEntity
 
         m_PauseScale = m_PauseCirle.localScale;
         m_PauseCirle.localScale = Vector3.zero;
+
+        var cds = FindObjectsOfType<DashCooldown>();
+        if (cds.Length > 0)
+        {
+            m_CooldownCharges = cds.Length;
+            for (int i = 0; i < cds.Length; i++)
+            {
+                m_Cooldowns.Add(cds[i]);
+            }
+
+            for (int write = 0; write < m_Cooldowns.Count; write++)
+            {
+                m_Cooldowns[write].SetTime(m_DashCooldown);
+                for (int sort = 0; sort < m_Cooldowns.Count - 1; sort++)
+                {
+                    if (m_Cooldowns[sort].m_ID > m_Cooldowns[sort + 1].m_ID)
+                    {
+                        DashCooldown temp = m_Cooldowns[sort];
+                        m_Cooldowns[sort] = m_Cooldowns[sort + 1];
+                        m_Cooldowns[sort + 1] = temp;
+                    }
+                }
+            }
+        }
+        else
+            Debug.LogError("Player could not find any cooldown sliders!");
     }
 	
 	void Update()
@@ -118,7 +150,7 @@ public class Player : PhysicsEntity
     void DashUpdate()
     {
         m_IsPaused = Input.GetMouseButton(1);
-        if (m_IsPaused && !m_Interrupted && !m_IsDash)
+        if (m_IsPaused && !m_Interrupted && !m_IsDash && HasCharges())
         {
             m_Rigidbody.velocity *= 0.3f;
             m_PauseTimer += Time.deltaTime;
@@ -138,7 +170,7 @@ public class Player : PhysicsEntity
         }
         else if (m_Interrupted)
             m_Interrupted = !Input.GetMouseButtonUp(1);
-        else if (!m_Interrupted && !m_IsDash)
+        else if (!m_Interrupted && !m_IsDash && HasCharges())
         {
             if (Input.GetMouseButtonUp(1))
             {
@@ -146,6 +178,8 @@ public class Player : PhysicsEntity
                 m_DashDir = m_CursorDir;
                 m_IsDash = true;
                 m_PauseTimer = 0.0f;
+                m_Cooldowns[m_CooldownCharges - 1].SetCooldown(true);
+                m_CooldownCharges--;
             }
         }
 
@@ -279,5 +313,15 @@ public class Player : PhysicsEntity
     {
         if (m_IsDash)
             InterruptDash();
+    }
+
+    public void IncreaseCDs()
+    {
+        m_CooldownCharges++;
+    }
+
+    bool HasCharges()
+    {
+        return m_CooldownCharges > 0;
     }
 }
