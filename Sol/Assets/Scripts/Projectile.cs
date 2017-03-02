@@ -24,6 +24,10 @@ public class Projectile : MonoBehaviour
                 pp.SetColor(GetComponent<SpriteRenderer>().color);
         }
 
+        PhysicsEntity pEntity = col.gameObject.GetComponent<PhysicsEntity>();
+        if (pEntity)
+            pEntity.OnHit();
+
         Destroy(gameObject);
     }
 }

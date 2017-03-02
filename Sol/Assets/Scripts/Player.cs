@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-[RequireComponent(typeof(Rigidbody2D), typeof(Collider2D))]
 public class Player : PhysicsEntity
 {
     //Public vars
@@ -13,6 +12,8 @@ public class Player : PhysicsEntity
     [Header("Air variables")]
     [Range(0.1f, 100.0f)]
     public float m_JumpForce = 20.0f;
+    [Range(0.0f, 10.0f)]
+    public float m_FallGraceTime = 0.5f;
 
     [Header("Dash variables")]
     [Range(0.1f, 10.0f)]
@@ -40,13 +41,12 @@ public class Player : PhysicsEntity
     [Header("Spawnable prefabs")]
     public GameObject m_ProjectilePrefab;
 
-    //Component vars
-    private Rigidbody2D m_Rigidbody;
-    private Collider2D m_Collider;
-
     //Air vars
     private bool m_Grounded = false;
-    private bool m_Jump = false;
+    private bool m_InAir = false;
+    private float m_FallGraceTimer = 0.0f;
+    private bool m_GraceJump = false;
+    private bool m_HasLanded = false;
 
     //Movement vars
     private float m_Horizontal = 0.0f;
@@ -61,7 +61,7 @@ public class Player : PhysicsEntity
     private Transform m_PauseCirle;
     private Vector3 m_PauseScale = Vector3.zero;
     private List<DashCooldown> m_Cooldowns = new List<DashCooldown>();
-    public int m_CooldownCharges = 0;
+    private int m_CooldownCharges = 0;
 
     //Rotation vars
     private Transform m_Cursor;
@@ -70,10 +70,9 @@ public class Player : PhysicsEntity
     //Shooting vars
     private float m_ShootTimer = 0.0f;
 
-    void Awake()
+    protected override void Awake()
     {
-        m_Rigidbody = GetComponent<Rigidbody2D>();
-        m_Collider = GetComponent<Collider2D>();
+        base.Awake();
 
         m_Cursor = transform.FindChild("CursorRotation");
         if (!m_Cursor)
@@ -97,7 +96,6 @@ public class Player : PhysicsEntity
 
             for (int write = 0; write < m_Cooldowns.Count; write++)
             {
-                m_Cooldowns[write].SetTime(m_DashCooldown);
                 for (int sort = 0; sort < m_Cooldowns.Count - 1; sort++)
                 {
                     if (m_Cooldowns[sort].m_ID > m_Cooldowns[sort + 1].m_ID)
@@ -111,6 +109,14 @@ public class Player : PhysicsEntity
         }
         else
             Debug.LogError("Player could not find any cooldown sliders!");
+    }
+
+    void Start()
+    {
+        for (int i = 0; i < m_Cooldowns.Count; i++)
+        {
+            m_Cooldowns[i].SetTime(m_DashCooldown);
+        }
     }
 	
 	void Update()
@@ -137,14 +143,43 @@ public class Player : PhysicsEntity
     void JumpUpdate()
     {
         m_Grounded = GroundCheck();
-        if (m_Grounded)
-            m_Rigidbody.gravityScale = 0.0f;
-        else
-            m_Rigidbody.gravityScale = 1.0f;
 
-        m_Jump = Mathf.Round(m_Rigidbody.velocity.y) > 0;
-        if (Input.GetKey(KeyCode.Space) && m_Grounded && !m_Jump)
-            m_Rigidbody.AddForce(Vector2.up * m_JumpForce, ForceMode2D.Impulse);
+        if (!m_IsDash)
+        {
+            if (m_Grounded)
+                m_Rigidbody.gravityScale = 0.0f;
+            else
+                m_Rigidbody.gravityScale = 1.0f;
+        }
+
+        m_InAir = Mathf.Round(m_Rigidbody.velocity.y) != 0;
+        if (m_InAir)
+            m_HasLanded = false;
+
+        if (Input.GetKey(KeyCode.Space) && ((m_Grounded && !m_InAir) || m_GraceJump))
+            Jump();
+
+        if (!m_Grounded && !m_InAir && m_HasLanded)
+            m_GraceJump = true;
+
+        if (m_GraceJump)
+        {
+            m_FallGraceTimer += Time.deltaTime;
+            if (m_FallGraceTimer >= m_FallGraceTime)
+            {
+                m_FallGraceTimer = 0.0f;
+                m_GraceJump = false;
+                m_HasLanded = false;
+            }
+        }
+    }
+
+    void Jump()
+    {
+        m_Rigidbody.AddForce(Vector2.up * m_JumpForce, ForceMode2D.Impulse);
+        m_GraceJump = false;
+        m_FallGraceTimer = 0.0f;
+        m_HasLanded = false;
     }
 
     void DashUpdate()
@@ -166,7 +201,7 @@ public class Player : PhysicsEntity
                 m_PauseCirle.localScale = m_PauseScale;
 
             //m_PauseCirle.localScale -= Vector3.one * (m_PauseScale.x - 1.0f) * Time.deltaTime;
-            m_PauseCirle.localScale = Vector3.Lerp(m_PauseCirle.localScale, Vector3.one, (m_PauseScale.x - 1.0f) * Time.deltaTime / m_PauseTime);
+            m_PauseCirle.localScale = Vector3.Lerp(m_PauseCirle.localScale, Vector3.one * 0.85f, (m_PauseScale.x - 1.0f) * Time.deltaTime / m_PauseTime);
         }
         else if (m_Interrupted)
             m_Interrupted = !Input.GetMouseButtonUp(1);
@@ -178,8 +213,9 @@ public class Player : PhysicsEntity
                 m_DashDir = m_CursorDir;
                 m_IsDash = true;
                 m_PauseTimer = 0.0f;
-                m_Cooldowns[m_CooldownCharges - 1].SetCooldown(true);
+                GetCooldown().SetCooldown(true);
                 m_CooldownCharges--;
+                m_Rigidbody.gravityScale = 0.0f;
             }
         }
 
@@ -192,6 +228,7 @@ public class Player : PhysicsEntity
             {
                 m_DashTimer = 0.0f;
                 m_IsDash = false;
+                m_Rigidbody.gravityScale = 1.0f;
                 m_Rigidbody.velocity *= 0.3f;
             }
         }
@@ -231,15 +268,6 @@ public class Player : PhysicsEntity
                 Shoot();
             }
         }
-        //else
-        //{
-        //    if (m_ShootTimer > 0.0f)
-        //    {
-        //        m_ShootTimer += Time.deltaTime;
-        //        if (m_ShootTimer >= m_ShootInterval)
-        //            m_ShootTimer = 0.0f;
-        //    }
-        //}
     }
 
     bool GroundCheck()
@@ -249,6 +277,13 @@ public class Player : PhysicsEntity
         pos.y -= m_Collider.bounds.size.y / 1.9f;
         pos.x -= dist / 2.0f;
         RaycastHit2D hit = DrawCast(pos, Vector2.right, dist, m_GroundMask);
+
+        if (hit)
+        {
+            if (!m_HasLanded)
+                m_HasLanded = true;
+        }
+
         return hit;
     }
 
@@ -306,18 +341,48 @@ public class Player : PhysicsEntity
     {
         m_IsDash = false;
         m_DashTimer = 0.0f;
+        m_Rigidbody.gravityScale = 1.0f;
         m_Rigidbody.velocity *= 0.3f;
+    }
+
+    public override void OnHit()
+    {
+        //Player got hit by something
+        Debug.Log("Player got hit");
     }
 
     void OnCollisionEnter2D(Collision2D col)
     {
         if (m_IsDash)
-            InterruptDash();
+        {
+            if (col.gameObject.tag != "Enemy")
+                InterruptDash();
+
+            PhysicsEntity pEntity = col.gameObject.GetComponent<PhysicsEntity>();
+            if (pEntity)
+                pEntity.OnHit();
+        }
     }
 
     public void IncreaseCDs()
     {
         m_CooldownCharges++;
+    }
+
+    DashCooldown GetCooldown()
+    {
+        DashCooldown cd = null;
+
+        for (int i = m_Cooldowns.Count - 1; i >= 0; i--)
+        {
+            if (!m_Cooldowns[i].GetCD())
+            {
+                cd = m_Cooldowns[i];
+                break;
+            }
+        }
+
+        return cd;
     }
 
     bool HasCharges()

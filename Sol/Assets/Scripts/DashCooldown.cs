@@ -11,17 +11,21 @@ public class DashCooldown : MonoBehaviour
 
     //Component vars
     private Slider m_Slider;
-    public Player m_Player;
+    private Player m_Player;
 
     //Timer vars
     private float m_Time = 1.0f;
     private float m_Timer = 0.0f;
     private bool m_Cooldown = false;
 
+    //Outline vars
+    private GameObject m_Outline;
+
     void Awake()
     {
         m_Slider = GetComponent<Slider>();
         m_Player = FindObjectOfType<Player>();
+        m_Outline = transform.FindChild("Outline").gameObject;
     }
 
     void Update()
@@ -37,6 +41,9 @@ public class DashCooldown : MonoBehaviour
                 m_Cooldown = false;
                 if (m_Player)
                     m_Player.IncreaseCDs();
+
+                if (m_Outline)
+                    m_Outline.SetActive(true);
             }
         }
     }
@@ -49,11 +56,18 @@ public class DashCooldown : MonoBehaviour
     public void SetCooldown(bool state)
     {
         m_Cooldown = state;
+
+        if (m_Cooldown)
+        {
+            if (m_Outline)
+                m_Outline.SetActive(false);
+        }
     }
 
     public void SetTime(float time)
     {
         m_Time = time;
         m_Slider.maxValue = time;
+        m_Slider.value = time;
     }
 }
