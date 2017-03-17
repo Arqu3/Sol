@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using XInputDotNetPure;
 
 public class Player : PhysicsEntity
 {
@@ -70,6 +71,10 @@ public class Player : PhysicsEntity
     //Shooting vars
     private float m_ShootTimer = 0.0f;
 
+    //Controller vars
+    private PlayerIndex m_PIndex;
+    private GamePadState m_GPadState;
+
     protected override void Awake()
     {
         base.Awake();
@@ -117,10 +122,25 @@ public class Player : PhysicsEntity
         {
             m_Cooldowns[i].SetTime(m_DashCooldown);
         }
+
+        for (int i = 0; i < 4; i++)
+        {
+            PlayerIndex test = (PlayerIndex)i;
+            GamePadState state = GamePad.GetState(test);
+
+            if (state.IsConnected)
+            {
+                m_PIndex = test;
+                Debug.Log("Found controller at index: " + i);
+                break;
+            }
+        }
     }
 	
 	void Update()
     {
+        m_GPadState = GamePad.GetState(m_PIndex);
+
         MovementUpdate();
         JumpUpdate();
         DashUpdate();
@@ -156,7 +176,7 @@ public class Player : PhysicsEntity
         if (m_InAir)
             m_HasLanded = false;
 
-        if (Input.GetKey(KeyCode.Space) && ((m_Grounded && !m_InAir) || m_GraceJump))
+        if ((Input.GetKey(KeyCode.Space) || m_GPadState.Buttons.A == ButtonState.Pressed) && ((m_Grounded && !m_InAir) || m_GraceJump))
             Jump();
 
         if (!m_Grounded && !m_InAir && m_HasLanded)
@@ -237,7 +257,7 @@ public class Player : PhysicsEntity
     public override void MovementUpdate()
     {
         if (!WallCheck())
-            m_Horizontal = Input.GetAxis("Horizontal");
+            m_Horizontal = m_GPadState.ThumbSticks.Left.X;
 
         if (!m_IsDash)
             m_Rigidbody.velocity = new Vector2(m_Horizontal * m_Speed, m_Rigidbody.velocity.y);
@@ -259,7 +279,7 @@ public class Player : PhysicsEntity
 
     void ShootUpdate()
     {
-        if (Input.GetMouseButton(0))
+        if (Input.GetMouseButton(0) || m_GPadState.Buttons.RightShoulder == ButtonState.Pressed)
         {
             m_ShootTimer += Time.deltaTime;
             if (m_ShootTimer >= m_ShootInterval)
