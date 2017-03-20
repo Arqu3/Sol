@@ -54,6 +54,7 @@ public class Player : PhysicsEntity
 
     //Dash vars
     private bool m_IsPaused = false;
+    private bool m_WasPaused = false;
     private float m_PauseTimer = 0.0f;
     private bool m_IsDash = false;
     private bool m_Interrupted = false;
@@ -152,11 +153,15 @@ public class Player : PhysicsEntity
     {
         if (m_Cursor)
         {
-            Vector2 dir = Input.mousePosition - Camera.main.WorldToScreenPoint(m_Cursor.position);
-            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+            //Vector2 dir = Input.mousePosition - Camera.main.WorldToScreenPoint(m_Cursor.position);
+            Vector2 dir = new Vector2(m_GPadState.ThumbSticks.Right.X, m_GPadState.ThumbSticks.Right.Y);
+            if (dir.magnitude > 0.0f)
+            {
+                float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
 
-            m_Cursor.rotation = Quaternion.AngleAxis(angle, Vector3.forward);
-            m_CursorDir = ((m_Cursor.position + m_Cursor.right) - transform.position).normalized;
+                m_Cursor.rotation = Quaternion.AngleAxis(angle, Vector3.forward);
+                m_CursorDir = ((m_Cursor.position + m_Cursor.right) - transform.position).normalized;
+            }
         }
     }
 
@@ -204,7 +209,7 @@ public class Player : PhysicsEntity
 
     void DashUpdate()
     {
-        m_IsPaused = Input.GetMouseButton(1);
+        m_IsPaused = Mathf.Round(m_GPadState.Triggers.Left) == 1.0f;
         if (m_IsPaused && !m_Interrupted && !m_IsDash && HasCharges())
         {
             m_Rigidbody.velocity *= 0.3f;
@@ -224,10 +229,10 @@ public class Player : PhysicsEntity
             m_PauseCirle.localScale = Vector3.Lerp(m_PauseCirle.localScale, Vector3.one * 0.85f, (m_PauseScale.x - 1.0f) * Time.deltaTime / m_PauseTime);
         }
         else if (m_Interrupted)
-            m_Interrupted = !Input.GetMouseButtonUp(1);
-        else if (!m_Interrupted && !m_IsDash && HasCharges())
+            m_Interrupted = Mathf.Round(m_GPadState.Triggers.Left) != 0.0f;
+        else if (!m_Interrupted && !m_IsDash && HasCharges() && m_WasPaused)
         {
-            if (Input.GetMouseButtonUp(1))
+            if (Mathf.Round(m_GPadState.Triggers.Left) == 0.0f)
             {
                 m_PauseCirle.localScale = Vector3.zero;
                 m_DashDir = m_CursorDir;
@@ -252,6 +257,8 @@ public class Player : PhysicsEntity
                 m_Rigidbody.velocity *= 0.3f;
             }
         }
+
+        m_WasPaused = m_IsPaused;
     }
 
     public override void MovementUpdate()
@@ -279,7 +286,7 @@ public class Player : PhysicsEntity
 
     void ShootUpdate()
     {
-        if (Input.GetMouseButton(0) || m_GPadState.Buttons.RightShoulder == ButtonState.Pressed)
+        if (Input.GetMouseButton(0) || Mathf.Round(m_GPadState.Triggers.Right) == 1.0f)
         {
             m_ShootTimer += Time.deltaTime;
             if (m_ShootTimer >= m_ShootInterval)

@@ -963,7 +963,7 @@ MonoBehaviour:
   m_ShootInterval: 0.1
   m_SpawnOffset: 1
   m_ProjectileSpeed: 30
-  m_ProjectileSpread: 7.5
+  m_ProjectileSpread: 5
   m_GroundMask:
     serializedVersion: 2
     m_Bits: 1537
