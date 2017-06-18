@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using XInputDotNetPure;
+using SolLib;
 
 public class Player : PhysicsEntity
 {
@@ -15,6 +16,8 @@ public class Player : PhysicsEntity
     public float m_JumpForce = 20.0f;
     [Range(0.0f, 10.0f)]
     public float m_FallGraceTime = 0.5f;
+    [Range(1, 10)]
+    public int m_NumberOfJumps = 1;
 
     [Header("Dash variables")]
     [Range(0.1f, 10.0f)]
@@ -48,6 +51,9 @@ public class Player : PhysicsEntity
     private float m_FallGraceTimer = 0.0f;
     private bool m_GraceJump = false;
     private bool m_HasLanded = false;
+    private int m_CurNumJumps = 0;
+    private bool m_IsJumpPressed = false;
+    private bool m_WasJumpPressed = false;
 
     //Movement vars
     private float m_Horizontal = 0.0f;
@@ -64,6 +70,7 @@ public class Player : PhysicsEntity
     private Vector3 m_PauseScale = Vector3.zero;
     private List<DashCooldown> m_Cooldowns = new List<DashCooldown>();
     private int m_CooldownCharges = 0;
+    private bool m_HasStartedCharge = false;
 
     //Rotation vars
     private Transform m_Cursor;
@@ -80,11 +87,11 @@ public class Player : PhysicsEntity
     {
         base.Awake();
 
-        m_Cursor = transform.FindChild("CursorRotation");
+        m_Cursor = transform.Find("CursorRotation");
         if (!m_Cursor)
             Debug.LogError("Player could not find cursor rotation!");
 
-        m_PauseCirle = transform.FindChild("PauseCircle");
+        m_PauseCirle = transform.Find("PauseCircle");
         if (!m_PauseCirle)
             Debug.LogError("Player could not find pause circle!");
 
@@ -136,6 +143,8 @@ public class Player : PhysicsEntity
                 break;
             }
         }
+
+        SolPhysics.DrawCast(transform.position, Vector2.up, 100.0f);
     }
 	
 	void Update()
@@ -155,7 +164,7 @@ public class Player : PhysicsEntity
         {
             //Vector2 dir = Input.mousePosition - Camera.main.WorldToScreenPoint(m_Cursor.position);
             Vector2 dir = new Vector2(m_GPadState.ThumbSticks.Right.X, m_GPadState.ThumbSticks.Right.Y);
-            if (dir.magnitude > 0.0f)
+            if (dir.magnitude > 0.3f)
             {
                 float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
 
@@ -167,6 +176,8 @@ public class Player : PhysicsEntity
 
     void JumpUpdate()
     {
+        m_IsJumpPressed = m_GPadState.Buttons.A == ButtonState.Pressed;
+
         m_Grounded = GroundCheck();
 
         if (!m_IsDash)
@@ -181,7 +192,7 @@ public class Player : PhysicsEntity
         if (m_InAir)
             m_HasLanded = false;
 
-        if ((Input.GetKey(KeyCode.Space) || m_GPadState.Buttons.A == ButtonState.Pressed) && ((m_Grounded && !m_InAir) || m_GraceJump))
+        if ((Input.GetKeyDown(KeyCode.Space) || (m_IsJumpPressed && !m_WasJumpPressed)) && (((m_Grounded && !m_InAir) || m_CurNumJumps < m_NumberOfJumps) || m_GraceJump))
             Jump();
 
         if (!m_Grounded && !m_InAir && m_HasLanded)
@@ -197,21 +208,31 @@ public class Player : PhysicsEntity
                 m_HasLanded = false;
             }
         }
+
+        m_WasJumpPressed = m_IsJumpPressed;
     }
 
     void Jump()
     {
+        ++m_CurNumJumps;
         m_Rigidbody.AddForce(Vector2.up * m_JumpForce, ForceMode2D.Impulse);
-        m_GraceJump = false;
+        m_GraceJump = m_HasLanded = false;
         m_FallGraceTimer = 0.0f;
-        m_HasLanded = false;
+        Toolbox.Instance.GetEventManager().OnPlayerJump(transform.position);
     }
 
     void DashUpdate()
     {
-        m_IsPaused = Mathf.Round(m_GPadState.Triggers.Left) == 1.0f;
+        m_IsPaused = Mathf.Round(m_GPadState.Triggers.Left) == 1.0f;  
+
         if (m_IsPaused && !m_Interrupted && !m_IsDash && HasCharges())
         {
+            if (!m_HasStartedCharge)
+            {
+                m_HasStartedCharge = true;
+                Toolbox.Instance.GetEventManager().OnPlayerDashChargeStart();
+            }
+
             m_Rigidbody.velocity *= 0.3f;
             m_PauseTimer += Time.deltaTime;
 
@@ -220,6 +241,7 @@ public class Player : PhysicsEntity
                 m_PauseTimer = 0.0f;
                 m_Interrupted = true;
                 m_PauseCirle.localScale = Vector3.zero;
+                m_HasStartedCharge = false;
             }
 
             if (Mathf.Round(m_PauseCirle.localScale.magnitude) == 0 && !m_Interrupted)
@@ -237,10 +259,12 @@ public class Player : PhysicsEntity
                 m_PauseCirle.localScale = Vector3.zero;
                 m_DashDir = m_CursorDir;
                 m_IsDash = true;
+                m_HasStartedCharge = false;
                 m_PauseTimer = 0.0f;
                 GetCooldown().SetCooldown(true);
                 m_CooldownCharges--;
                 m_Rigidbody.gravityScale = 0.0f;
+                Toolbox.Instance.GetEventManager().OnPlayerDashStart(this, m_DashDir);
             }
         }
 
@@ -303,12 +327,15 @@ public class Player : PhysicsEntity
         Vector2 pos = m_Collider.bounds.center;
         pos.y -= m_Collider.bounds.size.y / 1.9f;
         pos.x -= dist / 2.0f;
-        RaycastHit2D hit = DrawCast(pos, Vector2.right, dist, m_GroundMask);
+        RaycastHit2D hit = SolPhysics.DrawCast(pos, Vector2.right, dist, m_GroundMask);
 
         if (hit)
         {
             if (!m_HasLanded)
+            {
                 m_HasLanded = true;
+                m_CurNumJumps = 0;
+            }
         }
 
         return hit;
@@ -336,7 +363,7 @@ public class Player : PhysicsEntity
             pos.x -= x / 1.9f;
             pos.y -= dist / 2.0f;
 
-            RaycastHit2D rHit = DrawCast(pos, Vector2.up, dist, m_WallMask);
+            RaycastHit2D rHit = SolPhysics.DrawCast(pos, Vector2.up, dist, m_WallMask);
 
             if (rHit)
             {
@@ -380,6 +407,8 @@ public class Player : PhysicsEntity
 
     void OnCollisionEnter2D(Collision2D col)
     {
+        
+
         if (m_IsDash)
         {
             if (col.gameObject.tag != "Enemy")
@@ -398,18 +427,14 @@ public class Player : PhysicsEntity
 
     DashCooldown GetCooldown()
     {
-        DashCooldown cd = null;
-
         for (int i = m_Cooldowns.Count - 1; i >= 0; i--)
         {
             if (!m_Cooldowns[i].GetCD())
             {
-                cd = m_Cooldowns[i];
-                break;
+                return m_Cooldowns[i];
             }
         }
-
-        return cd;
+        return null;
     }
 
     bool HasCharges()

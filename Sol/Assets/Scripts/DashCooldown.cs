@@ -25,7 +25,7 @@ public class DashCooldown : MonoBehaviour
     {
         m_Slider = GetComponent<Slider>();
         m_Player = FindObjectOfType<Player>();
-        m_Outline = transform.FindChild("Outline").gameObject;
+        m_Outline = transform.Find("Outline").gameObject;
     }
 
     void Update()

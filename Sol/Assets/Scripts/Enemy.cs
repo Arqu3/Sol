@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using SolLib;
 
 public class Enemy : PhysicsEntity
 {
@@ -44,9 +45,9 @@ public class Enemy : PhysicsEntity
     {
         Vector2 pos = transform.position;
         pos.x += m_Collider.bounds.extents.x * 1.2f * m_Direction;
-        m_Grounded = DrawCast(pos, Vector2.down, 1.0f, m_GroundMask);
+        m_Grounded = SolPhysics.DrawCast(pos, Vector2.down, 1.0f, m_GroundMask);
 
-        m_Hit = DrawCast(pos, transform.right * m_Direction, 3.0f, m_WallMask);
+        m_Hit = SolPhysics.DrawCast(pos, transform.right * m_Direction, 3.0f, m_WallMask);
 
         if (m_Grounded)
         {
@@ -79,6 +80,7 @@ public class Enemy : PhysicsEntity
 
     public override void OnHit()
     {
+        Toolbox.Instance.GetEventManager().OnEnemyDeath(transform.position);
         Destroy(gameObject);
     }
 }
