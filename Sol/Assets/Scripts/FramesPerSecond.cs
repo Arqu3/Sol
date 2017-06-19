@@ -6,7 +6,11 @@ using UnityEngine.UI;
 public class FramesPerSecond : MonoBehaviour
 {
     //Public vars
+    [Range(0.01f, 10.0f)]
     public float m_UpdateInterval = 0.5f;
+
+    [Range(0, 5)]
+    public int m_NumberOfDecimals = 0;
 
     //Frame vars
     private float m_Accum = 0.0f;
@@ -32,6 +36,8 @@ public class FramesPerSecond : MonoBehaviour
 	
 	void Update()
     {
+        if (Input.GetKeyDown(KeyCode.R)) m_Text.enabled = !m_Text.enabled;
+
         m_TimeLeft -= Time.deltaTime;
         m_Accum += Time.timeScale / Time.deltaTime;
         ++m_Frames;
@@ -47,7 +53,7 @@ public class FramesPerSecond : MonoBehaviour
             else
                 m_Text.color = Color.green;
 
-            m_Text.text = fps.ToString("F0");
+            m_Text.text = fps.ToString("F" + m_NumberOfDecimals.ToString());
 
             m_TimeLeft = m_UpdateInterval;
             m_Accum = 0.0f;

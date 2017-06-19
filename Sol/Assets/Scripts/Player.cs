@@ -192,7 +192,7 @@ public class Player : PhysicsEntity
         if (m_InAir)
             m_HasLanded = false;
 
-        if ((Input.GetKeyDown(KeyCode.Space) || (m_IsJumpPressed && !m_WasJumpPressed)) && (((m_Grounded && !m_InAir) || m_CurNumJumps < m_NumberOfJumps) || m_GraceJump))
+        if ((Input.GetKeyDown(KeyCode.Space) || (m_IsJumpPressed && !m_WasJumpPressed)) && !m_IsDash && (((m_Grounded && !m_InAir) || m_CurNumJumps < m_NumberOfJumps) || m_GraceJump))
             Jump();
 
         if (!m_Grounded && !m_InAir && m_HasLanded)
@@ -214,6 +214,9 @@ public class Player : PhysicsEntity
 
     void Jump()
     {
+        Vector2 vel = m_Rigidbody.velocity;
+        vel.y = 0.0f;
+        m_Rigidbody.velocity = vel;
         ++m_CurNumJumps;
         m_Rigidbody.AddForce(Vector2.up * m_JumpForce, ForceMode2D.Impulse);
         m_GraceJump = m_HasLanded = false;

@@ -30,7 +30,12 @@ public class Enemy : PhysicsEntity
         if (Random.Range(0, 2) == 0)
             m_Direction = 1;
         else
+        {
             m_Direction = -1;
+            Vector3 scale = transform.localScale;
+            scale.x = -1;
+            transform.localScale = scale;
+        }
 
         m_Bools = new bool[1];
         m_Bools[0] = false;
@@ -60,6 +65,9 @@ public class Enemy : PhysicsEntity
             if (m_Hit)
             {
                 m_Direction *= -1;
+                Vector3 scale = transform.localScale;
+                scale.x *= -1;
+                transform.localScale = scale;
                 m_Acc = 0.0f;
                 StartCoroutine(WaitForTime(m_WaitTime, 0));
             }
