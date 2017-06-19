@@ -83,6 +83,9 @@ public class Player : PhysicsEntity
     private PlayerIndex m_PIndex;
     private GamePadState m_GPadState;
 
+    //Particle system vars
+    private ParticleSystem m_DashChargeSystem;
+
     protected override void Awake()
     {
         base.Awake();
@@ -97,6 +100,8 @@ public class Player : PhysicsEntity
 
         m_PauseScale = m_PauseCirle.localScale;
         m_PauseCirle.localScale = Vector3.zero;
+
+        m_DashChargeSystem = transform.Find("PlayerDashChargeParticles").GetComponent<ParticleSystem>();
 
         var cds = FindObjectsOfType<DashCooldown>();
         if (cds.Length > 0)
@@ -224,6 +229,12 @@ public class Player : PhysicsEntity
         Toolbox.Instance.GetEventManager().OnPlayerJump(transform.position);
     }
 
+    void DecrementNumJumps()
+    {
+        m_CurNumJumps -= 1;
+        if (m_CurNumJumps < 0) m_CurNumJumps = 0;
+    }
+
     void DashUpdate()
     {
         m_IsPaused = Mathf.Round(m_GPadState.Triggers.Left) == 1.0f;  
@@ -233,7 +244,7 @@ public class Player : PhysicsEntity
             if (!m_HasStartedCharge)
             {
                 m_HasStartedCharge = true;
-                Toolbox.Instance.GetEventManager().OnPlayerDashChargeStart();
+                Toolbox.Instance.GetEventManager().OnPlayerDashChargeStart(this);
             }
 
             m_Rigidbody.velocity *= 0.3f;
@@ -245,6 +256,7 @@ public class Player : PhysicsEntity
                 m_Interrupted = true;
                 m_PauseCirle.localScale = Vector3.zero;
                 m_HasStartedCharge = false;
+                Toolbox.Instance.GetEventManager().OnPlayerDashChargeInterrupted(this);
             }
 
             if (Mathf.Round(m_PauseCirle.localScale.magnitude) == 0 && !m_Interrupted)
@@ -268,6 +280,7 @@ public class Player : PhysicsEntity
                 m_CooldownCharges--;
                 m_Rigidbody.gravityScale = 0.0f;
                 Toolbox.Instance.GetEventManager().OnPlayerDashStart(this, m_DashDir);
+                DecrementNumJumps();
             }
         }
 
@@ -443,5 +456,10 @@ public class Player : PhysicsEntity
     bool HasCharges()
     {
         return m_CooldownCharges > 0;
+    }
+
+    public ParticleSystem GetDashChargeSystem()
+    {
+        return m_DashChargeSystem;
     }
 }

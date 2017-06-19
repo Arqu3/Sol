@@ -11,19 +11,26 @@ public class EventManager : MonoBehaviour
         SolGame.SpawnResourceByName("EnemyDeathParticles", position, 1.0f);
     }
 
-    public void OnPlayerDashChargeStart()
+    public void OnPlayerDashChargeStart(Player player)
     {
         Debug.Log("Event on player dash charge start");
-        Player player = Toolbox.Instance.GetPlayer();
-        GameObject go = (GameObject)SolGame.SpawnResourceByName("PlayerDashChargeParticles", player.transform.position, 1.0f);
-        go.transform.SetParent(player.transform);
+        ParticleSystem.EmissionModule em = player.GetDashChargeSystem().emission;
+        em.enabled = true;
+    }
+
+    public void OnPlayerDashChargeInterrupted(Player player)
+    {
+        Debug.Log("Event on player dash charge interrupted");
+        ParticleSystem.EmissionModule em = player.GetDashChargeSystem().emission;
+        em.enabled = false;
     }
 
     public void OnPlayerDashStart(Player player, Vector2 direction)
     {
         Debug.Log("Event on player dash start");
-        ParticleSystem system = player.transform.Find("PlayerDashChargeParticles(Clone)").GetComponent<ParticleSystem>();
-        if (system) Destroy(system.gameObject);
+
+        ParticleSystem.EmissionModule em = player.GetDashChargeSystem().emission;
+        em.enabled = false;
 
         GameObject go = (GameObject)SolGame.SpawnResourceByName("PlayerDashParticles", player.transform.position, 1.0f);
         go.transform.rotation = Quaternion.FromToRotation(Vector3.forward, -direction);

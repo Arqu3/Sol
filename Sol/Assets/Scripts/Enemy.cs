@@ -11,17 +11,31 @@ public class Enemy : PhysicsEntity
     public float m_WaitTime = 1.0f;
     public float m_Acceleration = 2.0f;
 
+    [Header("Projectile Variables")]
+    public GameObject m_ProjectilePrefab;
+    public Color m_ProjectileColor = Color.red;
+
+    [Header("Attacking variables")]
+    [Range(0.0f, 75.0f)]
+    public float m_AggroRange = 15.0f;
+    [Range(0.1f, 10.0f)]
+    public float m_FireRate = 1.0f;
+
     [Header("Raycast layermasks")]
     public LayerMask m_GroundMask;
     public LayerMask m_WallMask;
 
     //Movement vars
-    private bool m_Hit = false;
+    private bool m_HorizontalHit = false;
     private bool m_Grounded = false;
     private int m_Direction = 1;
     //private bool m_Waiting = false;
     private float m_Acc = 0.0f;
     private bool[] m_Bools;
+
+    //Shooting variables
+    private Transform m_PlayerTransform;
+    private float m_FireTimer = 0.0f;
 
     protected override void Awake()
     {
@@ -41,9 +55,15 @@ public class Enemy : PhysicsEntity
         m_Bools[0] = false;
     }
 
+    void Start()
+    {
+        m_PlayerTransform = Toolbox.Instance.GetPlayer().transform;
+    }
+
     void Update()
     {
         MovementUpdate();
+        ShootUpdate();
     }
 
     public override void MovementUpdate()
@@ -52,7 +72,7 @@ public class Enemy : PhysicsEntity
         pos.x += m_Collider.bounds.extents.x * 1.2f * m_Direction;
         m_Grounded = SolPhysics.DrawCast(pos, Vector2.down, 1.0f, m_GroundMask);
 
-        m_Hit = SolPhysics.DrawCast(pos, transform.right * m_Direction, 3.0f, m_WallMask);
+        m_HorizontalHit = SolPhysics.DrawCast(pos, transform.right * m_Direction, 3.0f, m_WallMask);
 
         if (m_Grounded)
         {
@@ -62,7 +82,7 @@ public class Enemy : PhysicsEntity
                 m_Acc = Mathf.Lerp(m_Acc, 1.0f, m_Acceleration * Time.deltaTime);
             }
 
-            if (m_Hit)
+            if (m_HorizontalHit)
             {
                 m_Direction *= -1;
                 Vector3 scale = transform.localScale;
@@ -72,6 +92,23 @@ public class Enemy : PhysicsEntity
                 StartCoroutine(WaitForTime(m_WaitTime, 0));
             }
         }
+    }
+
+    void ShootUpdate()
+    {
+        m_FireTimer += Time.deltaTime;
+        if (m_FireTimer >= m_FireRate)
+        {
+            m_FireTimer = 0.0f;
+            Shoot();
+        }
+    }
+
+    void Shoot()
+    {
+        GameObject go = Instantiate(m_ProjectilePrefab, transform.position + (m_PlayerTransform.position - transform.position).normalized, Quaternion.identity);
+        go.GetComponent<Rigidbody2D>().AddForce((m_PlayerTransform.position - transform.position).normalized * 10.0f, ForceMode2D.Impulse);
+        go.GetComponent<SpriteRenderer>().color = m_ProjectileColor;
     }
 
     IEnumerator WaitForTime(float time, int boolIndex)
