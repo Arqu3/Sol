@@ -34,17 +34,7 @@ public class DashCooldown : MonoBehaviour
         {
             m_Timer += Time.deltaTime;
             m_Slider.value = m_Timer;
-            if (m_Timer >= m_Time)
-            {
-                m_Timer = 0.0f;
-                m_Slider.value = m_Time;
-                m_Cooldown = false;
-                if (m_Player)
-                    m_Player.IncreaseCDs();
-
-                if (m_Outline)
-                    m_Outline.SetActive(true);
-            }
+            if (m_Timer >= m_Time) Reset();
         }
     }
 
@@ -69,5 +59,17 @@ public class DashCooldown : MonoBehaviour
         m_Time = time;
         m_Slider.maxValue = time;
         m_Slider.value = time;
+    }
+
+    public void Reset()
+    {
+        m_Timer = 0.0f;
+        m_Slider.value = m_Time;
+        m_Cooldown = false;
+        if (m_Player)
+            m_Player.IncreaseCDs();
+
+        if (m_Outline)
+            m_Outline.SetActive(true);
     }
 }

@@ -30,6 +30,7 @@ public class Player : PhysicsEntity
     public float m_DashCooldown = 1.0f;
 
     [Header("Shooting variables")]
+    public Color m_ProjectileColor = Color.blue;
     [Range(0.01f, 10.0f)]
     public float m_ShootInterval = 0.5f;
     public float m_SpawnOffset = 3.0f;
@@ -85,14 +86,15 @@ public class Player : PhysicsEntity
 
     //Particle system vars
     private ParticleSystem m_DashChargeSystem;
+    private ParticleSystem m_ShootSystem;
 
     protected override void Awake()
     {
         base.Awake();
 
         m_Cursor = transform.Find("CursorRotation");
-        if (!m_Cursor)
-            Debug.LogError("Player could not find cursor rotation!");
+        if (!m_Cursor) Debug.LogError("Player could not find cursor rotation!");
+        else m_ShootSystem = m_Cursor.GetComponentInChildren<ParticleSystem>();
 
         m_PauseCirle = transform.Find("PauseCircle");
         if (!m_PauseCirle)
@@ -315,12 +317,15 @@ public class Player : PhysicsEntity
         if (m_ProjectilePrefab)
         {
             GameObject clone = (GameObject)Instantiate(m_ProjectilePrefab, m_Cursor.position + m_Cursor.right * m_SpawnOffset, Quaternion.Euler(0.0f, 0.0f, m_Cursor.rotation.eulerAngles.z - 90));
-            if (clone.GetComponent<Projectile>())
+            Projectile proj = clone.GetComponent<Projectile>();
+            if (proj)
             {
                 clone.transform.Rotate(new Vector3(0, 0, Random.Range(-m_ProjectileSpread, m_ProjectileSpread)));
                 clone.GetComponent<Rigidbody2D>().AddForce(clone.transform.up * m_ProjectileSpeed, ForceMode2D.Impulse);
-                //clone.GetComponent<Rigidbody2D>().AddForce(m_CursorDir * m_ProjectileSpeed, ForceMode2D.Impulse);
+                proj.SetColor(m_ProjectileColor);
+                proj.SetLayer(true);
             }
+            m_ShootSystem.Emit(Random.Range(5, 11));
         }
     }
 
@@ -423,32 +428,43 @@ public class Player : PhysicsEntity
 
     void OnCollisionEnter2D(Collision2D col)
     {
-        
-
         if (m_IsDash)
         {
-            if (col.gameObject.tag != "Enemy")
+            string tag = col.gameObject.tag;
+            if (tag != "Enemy" && tag != "Projectile")
                 InterruptDash();
 
             PhysicsEntity pEntity = col.gameObject.GetComponent<PhysicsEntity>();
             if (pEntity)
+            {
                 pEntity.OnHit();
+
+                DashCooldown cd = GetFirstActiveCooldown();
+                if (cd) cd.Reset();
+            }
         }
     }
 
     public void IncreaseCDs()
     {
-        m_CooldownCharges++;
+        ++m_CooldownCharges;
     }
 
     DashCooldown GetCooldown()
     {
-        for (int i = m_Cooldowns.Count - 1; i >= 0; i--)
+        for (int i = m_Cooldowns.Count - 1; i >= 0; --i)
         {
-            if (!m_Cooldowns[i].GetCD())
-            {
-                return m_Cooldowns[i];
-            }
+            if (!m_Cooldowns[i].GetCD()) return m_Cooldowns[i];
+        }
+        return null;
+    }
+
+    DashCooldown GetFirstActiveCooldown()
+    {
+        Debug.Log("asd");
+        for (int i = m_Cooldowns.Count - 1; i >= 0; --i)
+        {
+            if (m_Cooldowns[i].GetCD()) return m_Cooldowns[i];
         }
         return null;
     }

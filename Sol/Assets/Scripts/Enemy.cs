@@ -3,8 +3,18 @@ using System.Collections.Generic;
 using UnityEngine;
 using SolLib;
 
+public enum EnemyState
+{
+    Patrolling,
+    Attacking,
+    Fleeing
+}
+
 public class Enemy : PhysicsEntity
 {
+    [Header("Current enemy state")]
+    public EnemyState m_State = EnemyState.Patrolling;
+
     [Header("Movement variables")]
     [Range(1.0f, 100.0f)]
     public float m_Speed = 10.0f;
@@ -24,6 +34,7 @@ public class Enemy : PhysicsEntity
     [Header("Raycast layermasks")]
     public LayerMask m_GroundMask;
     public LayerMask m_WallMask;
+    public LayerMask m_HitScanMask;
 
     //Movement vars
     private bool m_HorizontalHit = false;
@@ -96,11 +107,23 @@ public class Enemy : PhysicsEntity
 
     void ShootUpdate()
     {
-        m_FireTimer += Time.deltaTime;
-        if (m_FireTimer >= m_FireRate)
+        float dist = Vector2.Distance(transform.position, m_PlayerTransform.position);
+        if (dist < m_AggroRange)
         {
-            m_FireTimer = 0.0f;
-            Shoot();
+            Vector3 vec = (m_PlayerTransform.position - transform.position).normalized;
+            RaycastHit2D hit = SolPhysics.DrawCast(transform.position + vec, vec, dist, m_HitScanMask);
+            if (hit)
+            {
+                if (hit.transform.tag == "Player")
+                {
+                    m_FireTimer += Time.deltaTime;
+                    if (m_FireTimer >= m_FireRate)
+                    {
+                        m_FireTimer = 0.0f;
+                        Shoot();
+                    }
+                }
+            }
         }
     }
 
@@ -108,7 +131,8 @@ public class Enemy : PhysicsEntity
     {
         GameObject go = Instantiate(m_ProjectilePrefab, transform.position + (m_PlayerTransform.position - transform.position).normalized, Quaternion.identity);
         go.GetComponent<Rigidbody2D>().AddForce((m_PlayerTransform.position - transform.position).normalized * 10.0f, ForceMode2D.Impulse);
-        go.GetComponent<SpriteRenderer>().color = m_ProjectileColor;
+        go.GetComponent<Projectile>().SetColor(m_ProjectileColor);
+        go.GetComponent<Projectile>().SetLayer(false);
     }
 
     IEnumerator WaitForTime(float time, int boolIndex)

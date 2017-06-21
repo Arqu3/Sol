@@ -3,7 +3,9 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags: []
+  tags:
+  - Projectile
+  - Enemy
   layers:
   - Default
   - TransparentFX
@@ -16,10 +18,10 @@ TagManager:
   - Camera
   - Border
   - Moveable
-  - Projectile
-  - 
-  - 
-  - 
+  - PlayerProjectile
+  - EnemyProjectile
+  - Enemy
+  - Player
   - 
   - 
   - 
