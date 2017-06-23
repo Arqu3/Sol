@@ -55,6 +55,7 @@ public class Player : PhysicsEntity
     private int m_CurNumJumps = 0;
     private bool m_IsJumpPressed = false;
     private bool m_WasJumpPressed = false;
+    private float m_AirTime = 0.0f;
 
     //Movement vars
     private float m_Horizontal = 0.0f;
@@ -97,8 +98,7 @@ public class Player : PhysicsEntity
         else m_ShootSystem = m_Cursor.GetComponentInChildren<ParticleSystem>();
 
         m_PauseCirle = transform.Find("PauseCircle");
-        if (!m_PauseCirle)
-            Debug.LogError("Player could not find pause circle!");
+        if (!m_PauseCirle) Debug.LogError("Player could not find pause circle!");
 
         m_PauseScale = m_PauseCirle.localScale;
         m_PauseCirle.localScale = Vector3.zero;
@@ -127,8 +127,7 @@ public class Player : PhysicsEntity
                 }
             }
         }
-        else
-            Debug.LogError("Player could not find any cooldown sliders!");
+        else Debug.LogError("Player could not find any cooldown sliders!");
     }
 
     void Start()
@@ -150,8 +149,6 @@ public class Player : PhysicsEntity
                 break;
             }
         }
-
-        SolPhysics.DrawCast(transform.position, Vector2.up, 100.0f);
     }
 	
 	void Update()
@@ -187,6 +184,8 @@ public class Player : PhysicsEntity
 
         m_Grounded = GroundCheck();
 
+        if (!m_Grounded) m_AirTime += Time.deltaTime;
+
         if (!m_IsDash)
         {
             if (m_Grounded)
@@ -197,7 +196,9 @@ public class Player : PhysicsEntity
 
         m_InAir = Mathf.Round(m_Rigidbody.velocity.y) != 0;
         if (m_InAir)
+        {
             m_HasLanded = false;
+        }
 
         if ((Input.GetKeyDown(KeyCode.Space) || (m_IsJumpPressed && !m_WasJumpPressed)) && !m_IsDash && (((m_Grounded && !m_InAir) || m_CurNumJumps < m_NumberOfJumps) || m_GraceJump))
             Jump();
@@ -305,11 +306,9 @@ public class Player : PhysicsEntity
 
     public override void MovementUpdate()
     {
-        if (!WallCheck())
-            m_Horizontal = m_GPadState.ThumbSticks.Left.X;
+        if (!WallCheck()) m_Horizontal = m_GPadState.ThumbSticks.Left.X;
 
-        if (!m_IsDash)
-            m_Rigidbody.velocity = new Vector2(m_Horizontal * m_Speed, m_Rigidbody.velocity.y);
+        if (!m_IsDash) m_Rigidbody.velocity = new Vector2(m_Horizontal * m_Speed, m_Rigidbody.velocity.y);
     }
 
     void Shoot()
@@ -356,6 +355,7 @@ public class Player : PhysicsEntity
             {
                 m_HasLanded = true;
                 m_CurNumJumps = 0;
+                m_AirTime = 0.0f;
             }
         }
 
@@ -477,5 +477,10 @@ public class Player : PhysicsEntity
     public ParticleSystem GetDashChargeSystem()
     {
         return m_DashChargeSystem;
+    }
+
+    public float GetAirTime()
+    {
+        return m_AirTime;
     }
 }
